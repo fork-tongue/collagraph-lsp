@@ -1,0 +1,14 @@
+<widget>
+  <label obj_id="label" :text="message"></label>
+</widget>
+
+<script lang="python">
+from collagraph import Component
+
+class TestComponent(Component):
+    def init(self):
+        self.state["message"] = "Hello from bare template!"
+
+    def on_click(self):
+        self.state["message"] = "Button clicked!"
+</script>

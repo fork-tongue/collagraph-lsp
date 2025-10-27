@@ -1,0 +1,12 @@
+<label :text="message"></label>
+<button @clicked="on_click">Click me</button>
+
+<script lang="python">
+from collagraph import Component
+
+class TestComponent(Component):
+    message = "Hello from bare template!"
+
+    def on_click(self):
+        self.message = "Button clicked!"
+</script>
