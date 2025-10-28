@@ -21,6 +21,9 @@ dev = [
     "pytest-cov",
     "ruff",
 ]
+ruff = [
+    "ruff"
+]
 
 [project.scripts]
 collagraph-lsp = "collagraph_lsp.server:main"
