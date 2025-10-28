@@ -1,6 +1,7 @@
 """Main LSP server implementation for Collagraph files."""
 
 import logging
+from importlib.metadata import version
 
 from lsprotocol.types import (
     TEXT_DOCUMENT_DID_CHANGE,
@@ -27,7 +28,7 @@ from lsprotocol.types import (
     Diagnostic as LspDiagnostic,
 )
 from pygls.lsp.server import LanguageServer
-from ruff_cgx import RuffLinter, format_cgx_content
+from ruff_cgx import format_cgx_content, lint_cgx_content
 
 from .semantic_tokens import SemanticTokensProvider
 
@@ -40,14 +41,12 @@ logger = logging.getLogger(__name__)
 class CollagraphLanguageServer(LanguageServer):
     """Language server for Collagraph .cgx files."""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.linter = RuffLinter()
+    def init(self):
         self.semantic_tokens_provider = SemanticTokensProvider()
 
 
 # Create the server instance
-server = CollagraphLanguageServer("collagraph-lsp", "v0.1.0")
+server = CollagraphLanguageServer("collagraph-lsp", f"v{version('collagraph_lsp')}")
 
 
 def _severity_to_lsp(severity: str) -> DiagnosticSeverity:
@@ -82,7 +81,7 @@ def validate_document(ls: CollagraphLanguageServer, uri: str):
         logger.info(f"Validating document: {uri}")
 
         # Run the linter
-        diagnostics = ls.linter.lint_cgx_file(content, uri)
+        diagnostics = lint_cgx_content(content)
 
         # Convert to LSP diagnostics
         lsp_diagnostics = []

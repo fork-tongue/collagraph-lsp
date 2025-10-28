@@ -11,8 +11,7 @@ import collagraph as cg
 from PySide6.QtWidgets import QBoxLayout
 
 class TestComponent(cg.Component):
-    def __init__(self, props):
-        super().__init__(props)
+    def init(self):
         self.message = "Hello from Collagraph LSP!"
 
     def on_click(self):
