@@ -1,10 +1,16 @@
 """Integration tests for the LSP server."""
 
 import textwrap
+from importlib.metadata import version
 
 import pytest
 
-from collagraph_lsp.server import CollagraphLanguageServer, server, validate_document
+from collagraph_lsp.server import (
+    CollagraphLanguageServer,
+    lint_cgx_content,
+    server,
+    validate_document,
+)
 
 
 @pytest.fixture
@@ -17,15 +23,12 @@ def test_server_initialization(ls):
     """Test that the server initializes correctly."""
     assert ls.name == "collagraph-lsp-test"
     assert ls.version == "v0.1.0"
-    assert hasattr(ls, "linter")
-    assert ls.linter is not None
 
 
 def test_server_module_instance():
     """Test that the module-level server instance is properly configured."""
     assert server.name == "collagraph-lsp"
-    assert server.version == "v0.1.0"
-    assert hasattr(server, "linter")
+    assert server.version == f"v{version('collagraph_lsp')}"
 
 
 def test_did_open_handler():
@@ -77,7 +80,7 @@ def test_validate_document_with_valid_cgx(ls):
         """
     ).lstrip()
 
-    diagnostics = ls.linter.lint_cgx_file(content, "test.cgx")
+    diagnostics = lint_cgx_content(content)
 
     # Valid CGX should have no diagnostics (or only expected ones)
     assert isinstance(diagnostics, list)
@@ -101,7 +104,7 @@ def test_validate_document_with_python_errors(ls):
         """
     ).lstrip()
 
-    diagnostics = ls.linter.lint_cgx_file(content, "test_error.cgx")
+    diagnostics = lint_cgx_content(content)
 
     # Should detect Python errors
     assert len(diagnostics) > 0
@@ -154,7 +157,7 @@ def test_linter_integration(ls):
         """
     ).lstrip()
 
-    diagnostics = ls.linter.lint_cgx_file(test_content, "test.cgx")
+    diagnostics = lint_cgx_content(test_content)
 
     # Valid CGX should have no diagnostics (or only expected ones)
     assert isinstance(diagnostics, list)
@@ -178,7 +181,7 @@ def test_linter_detects_unused_imports(ls):
         """
     ).lstrip()
 
-    diagnostics = ls.linter.lint_cgx_file(test_content, "test.cgx")
+    diagnostics = lint_cgx_content(test_content)
 
     # Should detect the unused import
     assert len(diagnostics) > 0

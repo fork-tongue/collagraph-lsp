@@ -1,5 +1,7 @@
 """Tests for semantic tokens provider."""
 
+from textwrap import dedent
+
 from collagraph_lsp.semantic_tokens import SemanticTokensProvider
 
 
@@ -15,22 +17,24 @@ def test_semantic_tokens_provider_initialization():
 
 def test_get_tokens_from_script():
     """Test extracting tokens from script section."""
-    content = """<template>
-  <widget />
-</template>
+    content = dedent(
+        """
+        <template>
+            <widget />
+        </template>
 
-<script>
-import collagraph as cg
+        <script>
+        import collagraph as cg
 
-class MyComponent(cg.Component):
-    def __init__(self, props):
-        super().__init__(props)
-        self.state["count"] = 0
+        class MyComponent(cg.Component):
+            def init(self):
+                self.state["count"] = 0
 
-    def increment(self):
-        self.state["count"] += 1
-</script>
-"""
+            def increment(self, ev):
+                self.state["count"] += 1
+        </script>
+        """
+    ).lstrip()
     provider = SemanticTokensProvider()
     tokens = provider.get_tokens(content)
 
@@ -43,18 +47,21 @@ class MyComponent(cg.Component):
 
 def test_get_tokens_from_template():
     """Test extracting tokens from template section."""
-    content = """<template>
-  <widget>
-    <button @clicked="increment" :text="label" />
-  </widget>
-</template>
+    content = dedent(
+        """
+        <template>
+            <widget>
+                <button @clicked="increment" :text="label" />
+            </widget>
+        </template>
 
-<script>
-class MyComponent:
-    def increment(self):
-        pass
-</script>
-"""
+        <script>
+        class MyComponent:
+            def increment(self):
+                pass
+        </script>
+        """
+    ).lstrip()
     provider = SemanticTokensProvider()
     tokens = provider.get_tokens(content)
 
@@ -74,10 +81,13 @@ def test_get_tokens_empty_file():
 
 def test_get_tokens_no_script():
     """Test handling file with no script section."""
-    content = """<template>
-  <widget />
-</template>
-"""
+    content = dedent(
+        """
+        <template>
+            <widget />
+        </template>
+        """
+    ).lstrip()
     provider = SemanticTokensProvider()
     tokens = provider.get_tokens(content)
     # Should still extract template tokens
@@ -86,14 +96,17 @@ def test_get_tokens_no_script():
 
 def test_get_tokens_invalid_python():
     """Test handling invalid Python in script section."""
-    content = """<template>
-  <widget />
-</template>
+    content = dedent(
+        """
+        <template>
+            <widget />
+        </template>
 
-<script>
-def invalid syntax here
-</script>
-"""
+        <script>
+        def invalid syntax here
+        </script>
+        """
+    ).lstrip()
     provider = SemanticTokensProvider()
     tokens = provider.get_tokens(content)
     # Should not crash, just return empty or partial tokens
@@ -154,14 +167,17 @@ def test_encode_tokens_empty():
 
 def test_class_detection():
     """Test that class definitions are properly detected."""
-    content = """<script>
-class Foo:
-    pass
+    content = dedent(
+        """
+        <script>
+        class Foo:
+            pass
 
-class Bar(Foo):
-    pass
-</script>
-"""
+        class Bar(Foo):
+            pass
+        </script>
+        """
+    ).lstrip()
     provider = SemanticTokensProvider()
     tokens = provider.get_tokens(content)
 
@@ -171,15 +187,18 @@ class Bar(Foo):
 
 def test_method_detection():
     """Test that methods are properly detected."""
-    content = """<script>
-class MyClass:
-    def method_one(self):
-        pass
+    content = dedent(
+        """
+        <script>
+        class MyClass:
+            def method_one(self):
+                pass
 
-    def method_two(self, param):
-        pass
-</script>
-"""
+            def method_two(self, param):
+                pass
+        </script>
+        """
+    ).lstrip()
     provider = SemanticTokensProvider()
     tokens = provider.get_tokens(content)
 
@@ -189,15 +208,18 @@ class MyClass:
 
 def test_parameter_detection():
     """Test that parameters are properly detected (excluding self)."""
-    content = """<script>
-def my_function(arg1, arg2, arg3):
-    pass
+    content = dedent(
+        """
+        <script>
+        def my_function(arg1, arg2, arg3):
+            pass
 
-class MyClass:
-    def method(self, param1, param2):
-        pass
-</script>
-"""
+        class MyClass:
+            def method(self, param1, param2):
+                pass
+        </script>
+        """
+    ).lstrip()
     provider = SemanticTokensProvider()
     tokens = provider.get_tokens(content)
 
@@ -208,12 +230,15 @@ class MyClass:
 
 def test_import_detection():
     """Test that imports are properly detected."""
-    content = """<script>
-import collagraph
-from collagraph import Component
-from typing import List, Dict
-</script>
-"""
+    content = dedent(
+        """
+        <script>
+        import collagraph
+        from collagraph import Component
+        from typing import List, Dict
+        </script>
+        """
+    ).lstrip()
     provider = SemanticTokensProvider()
     tokens = provider.get_tokens(content)
 
@@ -223,31 +248,34 @@ from typing import List, Dict
 
 def test_complex_cgx_file():
     """Test with a complete CGX file similar to real usage."""
-    content = """<template>
-  <widget>
-    <button @clicked="increment" :text="button_label" />
-    <label :text="counter_text" />
-  </widget>
-</template>
+    content = dedent(
+        """
+        <template>
+          <widget>
+            <button @clicked="increment" :text="button_label" />
+            <label :text="counter_text" />
+          </widget>
+        </template>
 
-<script>
-import collagraph as cg
-from typing import Dict
+        <script>
+        import collagraph as cg
+        from typing import Dict
 
-class Counter(cg.Component):
-    def __init__(self, props: Dict):
-        super().__init__(props)
-        self.state["count"] = 0
-        self.button_label = "Click me"
+        class Counter(cg.Component):
+            def __init__(self, props: Dict):
+                super().__init__(props)
+                self.state["count"] = 0
+                self.button_label = "Click me"
 
-    def increment(self):
-        self.state["count"] += 1
+            def increment(self):
+                self.state["count"] += 1
 
-    @property
-    def counter_text(self):
-        return f"Count: {self.state['count']}"
-</script>
-"""
+            @property
+            def counter_text(self):
+                return f"Count: {self.state['count']}"
+        </script>
+        """
+    ).lstrip()
     provider = SemanticTokensProvider()
     tokens = provider.get_tokens(content)
 
