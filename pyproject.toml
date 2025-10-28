@@ -12,11 +12,8 @@ dependencies = [
     "pygls>=2.0.0",
     "ruff>=0.14.0",
     "collagraph>=0.8.0",
-    "ruff-cgx",
+    "ruff-cgx>=0.1.3",
 ]
-
-[tool.uv.sources]
-ruff-cgx = { path = "../ruff-cgx", editable = true }
 
 [dependency-groups]
 dev = [
