@@ -40,9 +40,7 @@ logger = logging.getLogger(__name__)
 class CollagraphLanguageServer(LanguageServer):
     """Language server for Collagraph .cgx files."""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.linter = RuffLinter()
+    def init(self):
         self.semantic_tokens_provider = SemanticTokensProvider()
 
 
