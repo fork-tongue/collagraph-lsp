@@ -8,6 +8,7 @@ Collagraph is a Python port of Vue.js, supporting single-file components in `.cg
 
 - **Linting with ruff**: Uses ruff to lint the Python code within the script tag
 - **Formatting with ruff**: Uses ruff to format the python code within the script tag and template expressions
+- **Python autocompletion**: Provides intelligent code completion for Python code in `<script>` sections using Jedi with full component context
 
 
 ## Installation

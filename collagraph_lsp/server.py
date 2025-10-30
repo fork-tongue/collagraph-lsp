@@ -4,12 +4,16 @@ import logging
 from importlib.metadata import version
 
 from lsprotocol.types import (
+    TEXT_DOCUMENT_COMPLETION,
     TEXT_DOCUMENT_DID_CHANGE,
     TEXT_DOCUMENT_DID_CLOSE,
     TEXT_DOCUMENT_DID_OPEN,
     TEXT_DOCUMENT_DID_SAVE,
     TEXT_DOCUMENT_FORMATTING,
     TEXT_DOCUMENT_SEMANTIC_TOKENS_FULL,
+    CompletionList,
+    CompletionOptions,
+    CompletionParams,
     DiagnosticSeverity,
     DidChangeTextDocumentParams,
     DidCloseTextDocumentParams,
@@ -30,6 +34,7 @@ from lsprotocol.types import (
 from pygls.lsp.server import LanguageServer
 from ruff_cgx import format_cgx_content, lint_cgx_content
 
+from .completions import analyze_context, get_python_completions
 from .semantic_tokens import SemanticTokensProvider
 
 logging.basicConfig(
@@ -225,6 +230,53 @@ def semantic_tokens_full(
     except Exception as e:
         logger.error(f"Error providing semantic tokens for {uri}: {e}", exc_info=True)
         return SemanticTokens(data=[])
+
+
+@server.feature(
+    TEXT_DOCUMENT_COMPLETION,
+    CompletionOptions(
+        trigger_characters=[".", "[", "(", '"', "'"],
+        resolve_provider=False,
+    ),
+)
+async def completions(
+    ls: CollagraphLanguageServer, params: CompletionParams
+) -> CompletionList:
+    """
+    Handle completion request.
+
+    Phase 1: Provides Python completions in <script> sections only.
+    """
+    uri = params.text_document.uri
+    position = params.position
+    logger.info(f"Providing completions for: {uri} at {position.line}:{position.character}")
+
+    try:
+        # Only process .cgx files
+        if not uri.endswith(".cgx"):
+            logger.debug(f"Skipping non-CGX file: {uri}")
+            return CompletionList(is_incomplete=False, items=[])
+
+        # Get the document
+        doc = ls.workspace.get_text_document(uri)
+        content = doc.source
+
+        # Determine the context at the cursor position
+        context = analyze_context(content, position)
+
+        # Phase 1: Only provide completions for <script> sections
+        if context.is_python_code:
+            items = await get_python_completions(content, position, context)
+            logger.info(f"Provided {len(items)} completions for {uri}")
+        else:
+            items = []
+            logger.debug(f"Cursor not in script section at {uri}:{position.line}:{position.character}")
+
+        return CompletionList(is_incomplete=False, items=items)
+
+    except Exception as e:
+        logger.error(f"Error providing completions for {uri}: {e}", exc_info=True)
+        return CompletionList(is_incomplete=False, items=[])
 
 
 def main():
