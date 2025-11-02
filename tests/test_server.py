@@ -237,3 +237,83 @@ def test_format_cgx_content(ls):
     ).lstrip()
 
     assert formatted == expected
+
+
+def test_initialize_handler_with_ruff_command(ls):
+    """Test that INITIALIZE handler accepts and applies ruffCommand."""
+    from lsprotocol.types import InitializeParams
+    from ruff_cgx import get_ruff_command, reset_ruff_command
+
+    from collagraph_lsp.server import initialize
+
+    # Reset to default first
+    reset_ruff_command()
+
+    # Create initialization params with ruffCommand
+    params = InitializeParams(
+        process_id=1234,
+        root_uri="file:///test",
+        capabilities={},
+        initialization_options={"ruffCommand": "custom-ruff"},
+    )
+
+    # Call initialize handler
+    initialize(ls, params)
+
+    # Check that settings were stored
+    assert ls.settings["ruffCommand"] == "custom-ruff"
+
+    # Check that ruff command was applied
+    assert get_ruff_command() == "custom-ruff"
+
+    # Reset after test
+    reset_ruff_command()
+
+
+def test_initialize_handler_without_options(ls):
+    """Test that INITIALIZE handler works without initialization options."""
+    from lsprotocol.types import InitializeParams
+    from ruff_cgx import reset_ruff_command
+
+    from collagraph_lsp.server import initialize
+
+    # Reset to default first
+    reset_ruff_command()
+
+    # Create initialization params without options
+    params = InitializeParams(process_id=1234, root_uri="file:///test", capabilities={})
+
+    # Call initialize handler
+    initialize(ls, params)
+
+    # Check that settings remain default
+    assert ls.settings["ruffCommand"] is None
+
+    # Reset after test
+    reset_ruff_command()
+
+
+def test_did_change_configuration_handler(ls):
+    """Test that WORKSPACE_DID_CHANGE_CONFIGURATION handler updates settings."""
+    from lsprotocol.types import DidChangeConfigurationParams
+    from ruff_cgx import get_ruff_command, reset_ruff_command
+
+    from collagraph_lsp.server import did_change_configuration
+
+    # Reset to default first
+    reset_ruff_command()
+
+    # Create configuration change params
+    params = DidChangeConfigurationParams(settings={"ruffCommand": "updated-ruff"})
+
+    # Call handler
+    did_change_configuration(ls, params)
+
+    # Check that settings were updated
+    assert ls.settings["ruffCommand"] == "updated-ruff"
+
+    # Check that ruff command was applied
+    assert get_ruff_command() == "updated-ruff"
+
+    # Reset after test
+    reset_ruff_command()

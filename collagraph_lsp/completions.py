@@ -1,62 +1,84 @@
 """Completion support for Collagraph .cgx files."""
 
-import ast
+import logging
 import re
-import tempfile
 from dataclasses import dataclass
-from pathlib import Path
 
 import jedi
-from collagraph.sfc import construct_ast
-from lsprotocol.types import CompletionItem, CompletionItemKind, InsertTextFormat, Position
+from lsprotocol.types import (
+    CompletionItem,
+    CompletionItemKind,
+    InsertTextFormat,
+    Position,
+)
 
 
 @dataclass
-class CompletionContext:
-    """Context information about the cursor position."""
+class ScriptRegion:
+    """Information about a script region and the cursor position within it."""
 
-    is_python_code: bool
-
-    # Full CGX source (needed for construct_ast)
-    full_source: str
-
-    # Position within the full file
-    original_position: Position
+    in_script: bool
+    script_content: str | None
+    script_line: int | None  # Line within script content (0-based)
+    script_column: int | None  # Column within script content (0-based)
 
 
-def analyze_context(source: str, position: Position) -> CompletionContext:
+def extract_script_region(source: str, position: Position) -> ScriptRegion:
     """
-    Analyze the .cgx file to determine what context the cursor is in.
+    Extract script region and transform position to be relative to script content.
 
-    Phase 1: Only detects if cursor is in <script> tag (Python code)
+    Handles multiple <script> sections by finding the one containing the cursor.
+
+    Returns:
+        ScriptRegion with:
+        - in_script: True if cursor is inside <script> content
+        - script_content: The Python code inside <script> tags (if in_script)
+        - script_line: Line number within script content (0-based, if in_script)
+        - script_column: Column number within script content (0-based, if in_script)
     """
-    # Check if in <script> tag
-    if is_in_script_region(source, position):
-        return CompletionContext(
-            is_python_code=True,
-            full_source=source,
-            original_position=position,
-        )
-
-    # Not in a Python region
-    return CompletionContext(
-        is_python_code=False,
-        full_source=source,
-        original_position=position,
-    )
-
-
-def is_in_script_region(source: str, position: Position) -> bool:
-    """Check if cursor is inside a <script> tag."""
     script_pattern = r"<script[^>]*>(.*?)</script>"
-    matches = re.finditer(script_pattern, source, re.DOTALL)
-    offset = position_to_offset(source, position)
 
-    for match in matches:
-        # Check if offset is within the script content (not the tags themselves)
-        if match.start(1) <= offset <= match.end(1):
-            return True
-    return False
+    # Calculate offset of cursor position in full source
+    source_offset = position_to_offset(source, position)
+
+    # Find all script sections and check which one contains the cursor
+    for match in re.finditer(script_pattern, source, re.DOTALL):
+        script_content = match.group(1)
+        script_start_offset = match.start(1)
+        script_end_offset = match.end(1)
+
+        # Check if cursor is within this script content
+        if script_start_offset <= source_offset <= script_end_offset:
+            # Calculate position within script content
+            script_offset = source_offset - script_start_offset
+
+            # Convert offset to line/column within script
+            script_lines = script_content.split("\n")
+            current_offset = 0
+            script_line = 0
+            script_column = 0
+
+            for line_idx, line in enumerate(script_lines):
+                if current_offset + len(line) + 1 > script_offset:  # +1 for newline
+                    script_line = line_idx
+                    script_column = script_offset - current_offset
+                    break
+                current_offset += len(line) + 1
+
+            return ScriptRegion(
+                in_script=True,
+                script_content=script_content,
+                script_line=script_line,
+                script_column=script_column,
+            )
+
+    # No script section contains the cursor
+    return ScriptRegion(
+        in_script=False,
+        script_content=None,
+        script_line=None,
+        script_column=None,
+    )
 
 
 def position_to_offset(source: str, position: Position) -> int:
@@ -68,47 +90,32 @@ def position_to_offset(source: str, position: Position) -> int:
 
 
 async def get_python_completions(
-    source: str,
-    position: Position,
-    context: CompletionContext,
+    script_region: ScriptRegion,
 ) -> list[CompletionItem]:
     """
-    Get Python completions using Jedi with full component context.
+    Get Python completions using Jedi for script sections.
 
-    This uses construct_ast (same as linter.py) to compile the template
-    into a render() method, giving Jedi full context about:
-    - All imports
-    - Component class structure
-    - state, props, computed properties
-    - Methods that template expressions can access
+    Phase 1: Provide completions for <script> section content.
+    Jedi can handle incomplete code (like "os.") which is common during typing.
+
+    Args:
+        script_region: ScriptRegion containing script content and cursor position
+
+    Returns:
+        List of completion items from Jedi
     """
-    if not context.is_python_code:
+    if not script_region.in_script or not script_region.script_content:
         return []
 
-    # Create a temporary file for construct_ast (it requires a file path)
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".cgx", delete=False) as tmp_file:
-        tmp_file.write(context.full_source)
-        tmp_path = Path(tmp_file.name)
-
     try:
-        # Use construct_ast to compile template into render() method
-        # This gives Jedi full context about what's available in templates
-        component_ast, _ = construct_ast(path=tmp_path, template=context.full_source)
+        # Use Jedi for Python completions on the script content
+        # Jedi handles incomplete code gracefully
+        script = jedi.Script(code=script_region.script_content)
 
-        # Convert AST back to source code for Jedi
-        virtual_source = ast.unparse(component_ast)
-
-        # Use Jedi for Python completions on the full virtual source
-        script = jedi.Script(
-            code=virtual_source,
-            path=str(tmp_path),
-        )
-
-        # Get completions at the original position
-        # Note: Line numbers are preserved by construct_ast
+        # Get completions (Jedi uses 1-based line numbers)
         completions = script.complete(
-            line=context.original_position.line + 1,  # Jedi uses 1-based line numbers
-            column=context.original_position.character,
+            line=script_region.script_line + 1,
+            column=script_region.script_column,
         )
 
         # Convert Jedi completions to LSP CompletionItems
@@ -119,7 +126,9 @@ async def get_python_completions(
                     label=comp.name,
                     kind=map_jedi_type_to_lsp(comp.type),
                     detail=comp.description,
-                    documentation=comp.docstring(raw=True) if comp.docstring() else None,
+                    documentation=comp.docstring(raw=True)
+                    if comp.docstring()
+                    else None,
                     insert_text=comp.name,
                     insert_text_format=InsertTextFormat.PlainText,
                     sort_text=comp.name,
@@ -128,14 +137,10 @@ async def get_python_completions(
 
         return items
 
-    except Exception:
-        # If construct_ast fails, fall back to basic completions
-        # (just the <script> section without template context)
+    except Exception as e:
+        # Return empty list on any error
+        logging.warning(f"Completion failed with error: {e}")
         return []
-
-    finally:
-        # Clean up temporary file
-        tmp_path.unlink(missing_ok=True)
 
 
 def map_jedi_type_to_lsp(jedi_type: str) -> CompletionItemKind:
