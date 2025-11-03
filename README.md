@@ -56,6 +56,16 @@ Coming soon:
 * VS Code
 * Zed
 
+### LSP settings
+
+Configure which command to use for ruff:
+
+```json
+{
+	"ruff_command": "/path/to/ruff"
+}
+```
+
 ## Development
 
 ### Running Tests
