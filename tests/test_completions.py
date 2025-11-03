@@ -73,8 +73,7 @@ class TestContextDetection:
 class TestPythonCompletions:
     """Test Python completions in script sections."""
 
-    @pytest.mark.asyncio
-    async def test_completion_context_in_script(self):
+    def test_completion_context_in_script(self):
         """Test that script region is correctly extracted for completions."""
         source = dedent(
             """
@@ -222,8 +221,7 @@ class TestPythonCompletions:
             "Expected component attributes in completions"
         )
 
-    @pytest.mark.asyncio
-    async def test_no_completion_in_template(self):
+    def test_no_completion_in_template(self):
         """Test that completions are not provided in template regions."""
         source = dedent(
             """
