@@ -4,18 +4,26 @@ import logging
 from importlib.metadata import version
 
 from lsprotocol.types import (
+    INITIALIZE,
+    TEXT_DOCUMENT_COMPLETION,
     TEXT_DOCUMENT_DID_CHANGE,
     TEXT_DOCUMENT_DID_CLOSE,
     TEXT_DOCUMENT_DID_OPEN,
     TEXT_DOCUMENT_DID_SAVE,
     TEXT_DOCUMENT_FORMATTING,
     TEXT_DOCUMENT_SEMANTIC_TOKENS_FULL,
+    WORKSPACE_DID_CHANGE_CONFIGURATION,
+    CompletionList,
+    CompletionOptions,
+    CompletionParams,
     DiagnosticSeverity,
+    DidChangeConfigurationParams,
     DidChangeTextDocumentParams,
     DidCloseTextDocumentParams,
     DidOpenTextDocumentParams,
     DidSaveTextDocumentParams,
     DocumentFormattingParams,
+    InitializeParams,
     Position,
     PublishDiagnosticsParams,
     Range,
@@ -28,8 +36,15 @@ from lsprotocol.types import (
     Diagnostic as LspDiagnostic,
 )
 from pygls.lsp.server import LanguageServer
-from ruff_cgx import format_cgx_content, lint_cgx_content
+from ruff_cgx import (
+    format_cgx_content,
+    get_ruff_command,
+    lint_cgx_content,
+    reset_ruff_command,
+    set_ruff_command,
+)
 
+from .completions import extract_script_region, get_python_completions
 from .semantic_tokens import SemanticTokensProvider
 
 logging.basicConfig(
@@ -41,12 +56,33 @@ logger = logging.getLogger(__name__)
 class CollagraphLanguageServer(LanguageServer):
     """Language server for Collagraph .cgx files."""
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.semantic_tokens_provider = SemanticTokensProvider()
+        # Configuration settings
+        self.settings = {
+            "ruff_command": None,  # None means use ruff_cgx default (env var or "ruff")
+        }
 
 
 # Create the server instance
 server = CollagraphLanguageServer("collagraph-lsp", f"v{version('collagraph_lsp')}")
+
+
+def _apply_ruff_command(ruff_command: str | None):
+    """
+    Apply the ruff command configuration.
+
+    Args:
+        ruff_command: Path or command name for ruff executable, or None to use default
+    """
+    if ruff_command:
+        logger.info(f"Setting ruff command to: {ruff_command}")
+        set_ruff_command(ruff_command)
+    else:
+        # Use ruff_cgx default (env var or "ruff")
+        reset_ruff_command()
+        logger.info(f"Using default ruff command: {get_ruff_command()}")
 
 
 def _severity_to_lsp(severity: str) -> DiagnosticSeverity:
@@ -105,6 +141,62 @@ def validate_document(ls: CollagraphLanguageServer, uri: str):
 
     except Exception as e:
         logger.error(f"Error validating document {uri}: {e}", exc_info=True)
+
+
+@server.feature(INITIALIZE)
+def initialize(ls: CollagraphLanguageServer, params: InitializeParams):
+    """
+    Handle initialization request from the client.
+
+    Accepts configuration via initialization options:
+    - ruff_command: Path or command name for ruff executable
+
+    Example initialization options from client:
+    {
+        "ruff_command": "/opt/homebrew/bin/ruff"
+    }
+    """
+    logger.info("Initializing Collagraph LSP server")
+
+    # Get initialization options
+    init_options = params.initialization_options or {}
+
+    # Extract settings
+    ruff_command = init_options.get("ruff_command")
+
+    # Store settings
+    if ruff_command is not None:
+        ls.settings["ruff_command"] = ruff_command
+
+    # Apply ruff command configuration
+    _apply_ruff_command(ls.settings["ruff_command"])
+
+    logger.info(f"Server initialized with settings: {ls.settings}")
+
+
+@server.feature(WORKSPACE_DID_CHANGE_CONFIGURATION)
+def did_change_configuration(
+    ls: CollagraphLanguageServer, params: DidChangeConfigurationParams
+):
+    """
+    Handle configuration change notifications from the client.
+
+    Expects settings in the format:
+    {
+        "ruff_command": "/opt/homebrew/bin/ruff"
+    }
+    """
+    logger.info("Configuration changed")
+
+    # Get settings from params
+    settings = params.settings
+
+    # Extract collagraph-lsp settings
+    if settings and "ruff_command" in settings:
+        # Update ruff command if provided
+        ls.settings["ruff_command"] = settings["ruff_command"]
+        _apply_ruff_command(ls.settings["ruff_command"])
+        logger.info(f"Updated settings: {ls.settings}")
 
 
 @server.feature(TEXT_DOCUMENT_DID_OPEN)
@@ -225,6 +317,58 @@ def semantic_tokens_full(
     except Exception as e:
         logger.error(f"Error providing semantic tokens for {uri}: {e}", exc_info=True)
         return SemanticTokens(data=[])
+
+
+@server.feature(
+    TEXT_DOCUMENT_COMPLETION,
+    CompletionOptions(
+        trigger_characters=[".", "[", "(", '"', "'"],
+        resolve_provider=False,
+    ),
+)
+async def completions(
+    ls: CollagraphLanguageServer, params: CompletionParams
+) -> CompletionList:
+    """
+    Handle completion request.
+
+    Phase 1: Provides Python completions in <script> sections only.
+    """
+    uri = params.text_document.uri
+    position = params.position
+    logger.info(
+        f"Providing completions for: {uri} at {position.line}:{position.character}"
+    )
+
+    try:
+        # Only process .cgx files
+        if not uri.endswith(".cgx"):
+            logger.debug(f"Skipping non-CGX file: {uri}")
+            return CompletionList(is_incomplete=False, items=[])
+
+        # Get the document
+        doc = ls.workspace.get_text_document(uri)
+        content = doc.source
+
+        # Extract script region at the cursor position
+        script_region = extract_script_region(content, position)
+
+        # Phase 1: Only provide completions for <script> sections
+        if script_region.in_script:
+            items = await get_python_completions(script_region)
+            logger.info(f"Provided {len(items)} completions for {uri}")
+        else:
+            items = []
+            logger.debug(
+                "Cursor not in script section at "
+                f"{uri}:{position.line}:{position.character}"
+            )
+
+        return CompletionList(is_incomplete=False, items=items)
+
+    except Exception as e:
+        logger.error(f"Error providing completions for {uri}: {e}", exc_info=True)
+        return CompletionList(is_incomplete=False, items=[])
 
 
 def main():
