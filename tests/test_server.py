@@ -240,7 +240,7 @@ def test_format_cgx_content(ls):
 
 
 def test_initialize_handler_with_ruff_command(ls):
-    """Test that INITIALIZE handler accepts and applies ruffCommand."""
+    """Test that INITIALIZE handler accepts and applies ruff_command."""
     from lsprotocol.types import InitializeParams
     from ruff_cgx import get_ruff_command, reset_ruff_command
 
@@ -249,19 +249,19 @@ def test_initialize_handler_with_ruff_command(ls):
     # Reset to default first
     reset_ruff_command()
 
-    # Create initialization params with ruffCommand
+    # Create initialization params with ruff_command
     params = InitializeParams(
         process_id=1234,
         root_uri="file:///test",
         capabilities={},
-        initialization_options={"ruffCommand": "custom-ruff"},
+        initialization_options={"ruff_command": "custom-ruff"},
     )
 
     # Call initialize handler
     initialize(ls, params)
 
     # Check that settings were stored
-    assert ls.settings["ruffCommand"] == "custom-ruff"
+    assert ls.settings["ruff_command"] == "custom-ruff"
 
     # Check that ruff command was applied
     assert get_ruff_command() == "custom-ruff"
@@ -287,7 +287,7 @@ def test_initialize_handler_without_options(ls):
     initialize(ls, params)
 
     # Check that settings remain default
-    assert ls.settings["ruffCommand"] is None
+    assert ls.settings["ruff_command"] is None
 
     # Reset after test
     reset_ruff_command()
@@ -304,13 +304,13 @@ def test_did_change_configuration_handler(ls):
     reset_ruff_command()
 
     # Create configuration change params
-    params = DidChangeConfigurationParams(settings={"ruffCommand": "updated-ruff"})
+    params = DidChangeConfigurationParams(settings={"ruff_command": "updated-ruff"})
 
     # Call handler
     did_change_configuration(ls, params)
 
     # Check that settings were updated
-    assert ls.settings["ruffCommand"] == "updated-ruff"
+    assert ls.settings["ruff_command"] == "updated-ruff"
 
     # Check that ruff command was applied
     assert get_ruff_command() == "updated-ruff"

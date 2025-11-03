@@ -40,6 +40,7 @@ from ruff_cgx import (
     format_cgx_content,
     get_ruff_command,
     lint_cgx_content,
+    reset_ruff_command,
     set_ruff_command,
 )
 
@@ -60,7 +61,7 @@ class CollagraphLanguageServer(LanguageServer):
         self.semantic_tokens_provider = SemanticTokensProvider()
         # Configuration settings
         self.settings = {
-            "ruffCommand": None,  # None means use ruff_cgx default (env var or "ruff")
+            "ruff_command": None,  # None means use ruff_cgx default (env var or "ruff")
         }
 
 
@@ -80,6 +81,7 @@ def _apply_ruff_command(ruff_command: str | None):
         set_ruff_command(ruff_command)
     else:
         # Use ruff_cgx default (env var or "ruff")
+        reset_ruff_command()
         logger.info(f"Using default ruff command: {get_ruff_command()}")
 
 
@@ -147,11 +149,11 @@ def initialize(ls: CollagraphLanguageServer, params: InitializeParams):
     Handle initialization request from the client.
 
     Accepts configuration via initialization options:
-    - ruffCommand: Path or command name for ruff executable
+    - ruff_command: Path or command name for ruff executable
 
     Example initialization options from client:
     {
-        "ruffCommand": "/opt/homebrew/bin/ruff"
+        "ruff_command": "/opt/homebrew/bin/ruff"
     }
     """
     logger.info("Initializing Collagraph LSP server")
@@ -160,14 +162,14 @@ def initialize(ls: CollagraphLanguageServer, params: InitializeParams):
     init_options = params.initialization_options or {}
 
     # Extract settings
-    ruff_command = init_options.get("ruffCommand")
+    ruff_command = init_options.get("ruff_command")
 
     # Store settings
     if ruff_command is not None:
-        ls.settings["ruffCommand"] = ruff_command
+        ls.settings["ruff_command"] = ruff_command
 
     # Apply ruff command configuration
-    _apply_ruff_command(ls.settings["ruffCommand"])
+    _apply_ruff_command(ls.settings["ruff_command"])
 
     logger.info(f"Server initialized with settings: {ls.settings}")
 
@@ -181,9 +183,7 @@ def did_change_configuration(
 
     Expects settings in the format:
     {
-        "collagraph-lsp": {
-            "ruffCommand": "/opt/homebrew/bin/ruff"
-        }
+        "ruff_command": "/opt/homebrew/bin/ruff"
     }
     """
     logger.info("Configuration changed")
@@ -192,12 +192,11 @@ def did_change_configuration(
     settings = params.settings
 
     # Extract collagraph-lsp settings
-    if isinstance(settings, dict):
+    if settings and "ruff_command" in settings:
         # Update ruff command if provided
-        if "ruffCommand" in settings:
-            ls.settings["ruffCommand"] = settings["ruffCommand"]
-            _apply_ruff_command(ls.settings["ruffCommand"])
-            logger.info(f"Updated settings: {ls.settings}")
+        ls.settings["ruff_command"] = settings["ruff_command"]
+        _apply_ruff_command(ls.settings["ruff_command"])
+        logger.info(f"Updated settings: {ls.settings}")
 
 
 @server.feature(TEXT_DOCUMENT_DID_OPEN)
