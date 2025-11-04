@@ -11,7 +11,6 @@ from lsprotocol.types import (
     TEXT_DOCUMENT_DID_OPEN,
     TEXT_DOCUMENT_DID_SAVE,
     TEXT_DOCUMENT_FORMATTING,
-    TEXT_DOCUMENT_SEMANTIC_TOKENS_FULL,
     WORKSPACE_DID_CHANGE_CONFIGURATION,
     CompletionList,
     CompletionOptions,
@@ -27,9 +26,6 @@ from lsprotocol.types import (
     Position,
     PublishDiagnosticsParams,
     Range,
-    SemanticTokens,
-    SemanticTokensLegend,
-    SemanticTokensParams,
     TextEdit,
 )
 from lsprotocol.types import (
@@ -45,7 +41,6 @@ from ruff_cgx import (
 )
 
 from .completions import extract_script_region, get_python_completions
-from .semantic_tokens import SemanticTokensProvider
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -58,7 +53,6 @@ class CollagraphLanguageServer(LanguageServer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.semantic_tokens_provider = SemanticTokensProvider()
         # Configuration settings
         self.settings = {
             "ruff_command": None,  # None means use ruff_cgx default (env var or "ruff")
@@ -275,48 +269,6 @@ def formatting(ls: CollagraphLanguageServer, params: DocumentFormattingParams):
     except Exception as e:
         logger.error(f"Error formatting document {uri}: {e}", exc_info=True)
         return []
-
-
-@server.feature(
-    TEXT_DOCUMENT_SEMANTIC_TOKENS_FULL,
-    SemanticTokensLegend(
-        token_types=SemanticTokensProvider().token_types,
-        token_modifiers=SemanticTokensProvider().token_modifiers,
-    ),
-)
-def semantic_tokens_full(
-    ls: CollagraphLanguageServer, params: SemanticTokensParams
-) -> SemanticTokens:
-    """
-    Handle semantic tokens request.
-
-    Provides rich syntax highlighting based on semantic analysis of the code.
-    """
-    uri = params.text_document.uri
-    logger.info(f"Providing semantic tokens for: {uri}")
-
-    try:
-        # Only process .cgx files
-        if not uri.endswith(".cgx"):
-            logger.debug(f"Skipping non-CGX file: {uri}")
-            return SemanticTokens(data=[])
-
-        # Get the document
-        doc = ls.workspace.get_text_document(uri)
-        content = doc.source
-
-        # Extract semantic tokens
-        tokens = ls.semantic_tokens_provider.get_tokens(content, uri)
-
-        # Encode tokens in LSP format
-        encoded_data = ls.semantic_tokens_provider.encode_tokens(tokens)
-
-        logger.info(f"Provided {len(tokens)} semantic tokens for {uri}")
-        return SemanticTokens(data=encoded_data)
-
-    except Exception as e:
-        logger.error(f"Error providing semantic tokens for {uri}: {e}", exc_info=True)
-        return SemanticTokens(data=[])
 
 
 @server.feature(
