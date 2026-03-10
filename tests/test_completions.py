@@ -11,8 +11,8 @@ from lsprotocol.types import Position
 from collagraph_lsp.completions import (
     extract_script_region,
     get_python_completions,
-    position_to_offset,
 )
+from collagraph_lsp.utils import position_to_offset
 
 
 class TestContextDetection:

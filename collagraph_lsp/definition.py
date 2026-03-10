@@ -7,11 +7,12 @@ Supports:
 
 import ast
 import logging
-import re
 from dataclasses import dataclass
 from functools import lru_cache
 
 from lsprotocol.types import Location, Position, Range
+
+from .utils import ScriptBlock, find_script_blocks, position_to_offset
 
 logger = logging.getLogger(__name__)
 
@@ -23,38 +24,6 @@ class SymbolDefinition:
     name: str
     line: int  # 0-based line within the full .cgx file
     column: int  # 0-based column
-
-
-@dataclass
-class ScriptBlock:
-    """Parsed <script> block with its position in the .cgx file."""
-
-    content: str
-    start_line: int  # 0-based line of first line of content (after <script> tag)
-    start_offset: int  # character offset in full source where content starts
-    end_offset: int  # character offset in full source where content ends
-
-
-def find_script_blocks(source: str) -> list[ScriptBlock]:
-    """
-    Find all <script> blocks in a .cgx source and return their content and offsets.
-    """
-    blocks = []
-    for match in re.finditer(r"<script[^>]*>(.*?)</script>", source, re.DOTALL):
-        content = match.group(1)
-        start_offset = match.start(1)
-        end_offset = match.end(1)
-        # Count newlines before start_offset to get the start line
-        start_line = source[:start_offset].count("\n")
-        blocks.append(
-            ScriptBlock(
-                content=content,
-                start_line=start_line,
-                start_offset=start_offset,
-                end_offset=end_offset,
-            )
-        )
-    return blocks
 
 
 def _collect_target_names(target: ast.AST) -> list[tuple[str, int, int]]:
@@ -141,14 +110,6 @@ def build_symbol_table(block: ScriptBlock) -> dict[str, SymbolDefinition]:
     return symbols
 
 
-def _position_to_offset(source: str, position: Position) -> int:
-    """Convert a Position (line, character) to a character offset in the source."""
-    lines = source.split("\n")
-    offset = sum(len(line) + 1 for line in lines[: position.line])
-    offset += position.character
-    return offset
-
-
 def _get_word_at_offset(source: str, offset: int) -> str | None:
     """Extract the Python identifier at the given offset."""
     if offset < 0 or offset >= len(source):
@@ -192,7 +153,7 @@ def get_definition(source: str, position: Position, uri: str) -> Location | None
         logger.warning("Could not construct symbols")
         return None
 
-    offset = _position_to_offset(source, position)
+    offset = position_to_offset(source, position)
     word = _get_word_at_offset(source, offset)
     if not word:
         logger.info(f"No word found at {source}, {position}")

@@ -6,9 +6,9 @@ from lsprotocol.types import Position
 
 from collagraph_lsp.definition import (
     build_symbol_table,
-    find_script_blocks,
     get_definition,
 )
+from collagraph_lsp.utils import find_script_blocks
 
 
 class TestFindScriptBlocks:
