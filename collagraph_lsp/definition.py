@@ -142,10 +142,6 @@ def get_definition(source: str, position: Position, uri: str) -> Location | None
     """
     Find the definition of the symbol at the given position.
 
-    Supports cursors in:
-    - <script> blocks (script → script)
-    - {{ interpolations }} in <template> blocks (template → script)
-
     Returns an LSP Location or None if no definition is found.
     """
     symbols = get_symbols(source)
