@@ -6,6 +6,7 @@ from importlib.metadata import version
 from lsprotocol.types import (
     INITIALIZE,
     TEXT_DOCUMENT_COMPLETION,
+    TEXT_DOCUMENT_DEFINITION,
     TEXT_DOCUMENT_DID_CHANGE,
     TEXT_DOCUMENT_DID_CLOSE,
     TEXT_DOCUMENT_DID_OPEN,
@@ -15,6 +16,7 @@ from lsprotocol.types import (
     CompletionList,
     CompletionOptions,
     CompletionParams,
+    DefinitionParams,
     DiagnosticSeverity,
     DidChangeConfigurationParams,
     DidChangeTextDocumentParams,
@@ -23,6 +25,7 @@ from lsprotocol.types import (
     DidSaveTextDocumentParams,
     DocumentFormattingParams,
     InitializeParams,
+    Location,
     Position,
     PublishDiagnosticsParams,
     Range,
@@ -41,6 +44,7 @@ from ruff_cgx import (
 )
 
 from .completions import extract_script_region, get_python_completions
+from .definition import get_definition
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -271,6 +275,40 @@ def formatting(ls: CollagraphLanguageServer, params: DocumentFormattingParams):
         return []
 
 
+@server.feature(TEXT_DOCUMENT_DEFINITION)
+def definition(
+    ls: CollagraphLanguageServer, params: DefinitionParams
+) -> Location | None:
+    """Handle go-to-definition request."""
+    uri = params.text_document.uri
+    position = params.position
+    logger.info(
+        f"Definition request for: {uri} at {position.line}:{position.character}"
+    )
+
+    try:
+        if not uri.endswith(".cgx"):
+            logger.info(f"Uri doesn't end with cgx: {uri}")
+            return None
+
+        doc = ls.workspace.get_text_document(uri)
+        result = get_definition(doc.source, position, uri)
+        if result:
+            logger.info(
+                "Definition found at "
+                f"{result.range.start.line}:{result.range.start.character}"
+            )
+        else:
+            logger.info(
+                f"No definition found for {uri}:{position.line}:{position.character}"
+            )
+        return result
+
+    except Exception as e:
+        logger.error(f"Error providing definition for {uri}: {e}", exc_info=True)
+        return None
+
+
 @server.feature(
     TEXT_DOCUMENT_COMPLETION,
     CompletionOptions(
@@ -327,7 +365,7 @@ def main():
     """Main entry point for the LSP server."""
 
     # Start the server using stdin/stdout
-    logger.info("Starting Collagraph LSP server...")
+    logger.info(f"Starting Collagraph LSP server ({version('collagraph_lsp')})...")
     server.start_io()
 
 

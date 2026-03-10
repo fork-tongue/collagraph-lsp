@@ -1,7 +1,6 @@
 """Completion support for Collagraph .cgx files."""
 
 import logging
-import re
 from dataclasses import dataclass
 
 import jedi
@@ -11,6 +10,8 @@ from lsprotocol.types import (
     InsertTextFormat,
     Position,
 )
+
+from .utils import find_script_blocks, position_to_offset
 
 
 @dataclass
@@ -36,16 +37,14 @@ def extract_script_region(source: str, position: Position) -> ScriptRegion:
         - script_line: Line number within script content (0-based, if in_script)
         - script_column: Column number within script content (0-based, if in_script)
     """
-    script_pattern = r"<script[^>]*>(.*?)</script>"
-
     # Calculate offset of cursor position in full source
     source_offset = position_to_offset(source, position)
 
     # Find all script sections and check which one contains the cursor
-    for match in re.finditer(script_pattern, source, re.DOTALL):
-        script_content = match.group(1)
-        script_start_offset = match.start(1)
-        script_end_offset = match.end(1)
+    for block in find_script_blocks(source):
+        script_content = block.content
+        script_start_offset = block.start_offset
+        script_end_offset = block.end_offset
 
         # Check if cursor is within this script content
         if script_start_offset <= source_offset <= script_end_offset:
@@ -79,14 +78,6 @@ def extract_script_region(source: str, position: Position) -> ScriptRegion:
         script_line=None,
         script_column=None,
     )
-
-
-def position_to_offset(source: str, position: Position) -> int:
-    """Convert Position (line, character) to string offset."""
-    lines = source.split("\n")
-    offset = sum(len(line) + 1 for line in lines[: position.line])  # +1 for newline
-    offset += position.character
-    return offset
 
 
 async def get_python_completions(
