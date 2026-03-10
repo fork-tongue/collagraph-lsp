@@ -288,14 +288,19 @@ def definition(
 
     try:
         if not uri.endswith(".cgx"):
+            logger.info(f"Uri doesn't end with cgx: {uri}")
             return None
 
         doc = ls.workspace.get_text_document(uri)
         result = get_definition(doc.source, position, uri)
         if result:
-            logger.info(f"Definition found at {result.range.start.line}:{result.range.start.character}")
+            logger.info(
+                f"Definition found at {result.range.start.line}:{result.range.start.character}"
+            )
         else:
-            logger.debug(f"No definition found for {uri}:{position.line}:{position.character}")
+            logger.info(
+                f"No definition found for {uri}:{position.line}:{position.character}"
+            )
         return result
 
     except Exception as e:
@@ -359,7 +364,7 @@ def main():
     """Main entry point for the LSP server."""
 
     # Start the server using stdin/stdout
-    logger.info("Starting Collagraph LSP server...")
+    logger.info(f"Starting Collagraph LSP server ({version('collagraph_lsp')})...")
     server.start_io()
 
 
