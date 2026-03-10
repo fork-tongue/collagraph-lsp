@@ -295,7 +295,8 @@ def definition(
         result = get_definition(doc.source, position, uri)
         if result:
             logger.info(
-                f"Definition found at {result.range.start.line}:{result.range.start.character}"
+                "Definition found at "
+                f"{result.range.start.line}:{result.range.start.character}"
             )
         else:
             logger.info(

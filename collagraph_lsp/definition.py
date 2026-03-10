@@ -36,7 +36,9 @@ class ScriptBlock:
 
 
 def find_script_blocks(source: str) -> list[ScriptBlock]:
-    """Find all <script> blocks in a .cgx source and return their content and offsets."""
+    """
+    Find all <script> blocks in a .cgx source and return their content and offsets.
+    """
     blocks = []
     for match in re.finditer(r"<script[^>]*>(.*?)</script>", source, re.DOTALL):
         content = match.group(1)
@@ -69,7 +71,9 @@ def _collect_target_names(target: ast.AST) -> list[tuple[str, int, int]]:
 
 
 def build_symbol_table(block: ScriptBlock) -> dict[str, SymbolDefinition]:
-    """Build a symbol table from the Python code in a script block using the ast module."""
+    """
+    Build a symbol table from the Python code in a script block using the ast module.
+    """
     symbols: dict[str, SymbolDefinition] = {}
     try:
         tree = ast.parse(block.content)
