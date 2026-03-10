@@ -56,8 +56,7 @@ class TestBuildSymbolTable:
 
         blocks = find_script_blocks(source)
         symbols = build_symbol_table(blocks[0])
-        names = [s.name for s in symbols]
-        assert "x" in names
+        assert "x" in symbols
 
     def test_function_def(self):
         source = dedent("""\
@@ -68,8 +67,7 @@ class TestBuildSymbolTable:
 
         blocks = find_script_blocks(source)
         symbols = build_symbol_table(blocks[0])
-        names = [s.name for s in symbols]
-        assert "handle_click" in names
+        assert "handle_click" in symbols
 
     def test_class_def(self):
         source = dedent("""\
@@ -80,8 +78,7 @@ class TestBuildSymbolTable:
 
         blocks = find_script_blocks(source)
         symbols = build_symbol_table(blocks[0])
-        names = [s.name for s in symbols]
-        assert "MyComponent" in names
+        assert "MyComponent" in symbols
 
     def test_import(self):
         source = dedent("""\
@@ -92,9 +89,8 @@ class TestBuildSymbolTable:
 
         blocks = find_script_blocks(source)
         symbols = build_symbol_table(blocks[0])
-        names = [s.name for s in symbols]
-        assert "os" in names
-        assert "path" in names
+        assert "os" in symbols
+        assert "path" in symbols
 
     def test_import_alias(self):
         source = dedent("""\
@@ -105,11 +101,10 @@ class TestBuildSymbolTable:
 
         blocks = find_script_blocks(source)
         symbols = build_symbol_table(blocks[0])
-        names = [s.name for s in symbols]
-        assert "np" in names
-        assert "OD" in names
-        assert "numpy" not in names
-        assert "OrderedDict" not in names
+        assert "np" in symbols
+        assert "OD" in symbols
+        assert "numpy" not in symbols
+        assert "OrderedDict" not in symbols
 
     def test_tuple_unpacking(self):
         source = dedent("""\
@@ -119,9 +114,8 @@ class TestBuildSymbolTable:
 
         blocks = find_script_blocks(source)
         symbols = build_symbol_table(blocks[0])
-        names = [s.name for s in symbols]
-        assert "a" in names
-        assert "b" in names
+        assert "a" in symbols
+        assert "b" in symbols
 
     def test_annotated_assignment(self):
         source = dedent("""\
@@ -131,8 +125,7 @@ class TestBuildSymbolTable:
 
         blocks = find_script_blocks(source)
         symbols = build_symbol_table(blocks[0])
-        names = [s.name for s in symbols]
-        assert "x" in names
+        assert "x" in symbols
 
     def test_async_function_def(self):
         source = dedent("""\
@@ -143,8 +136,7 @@ class TestBuildSymbolTable:
 
         blocks = find_script_blocks(source)
         symbols = build_symbol_table(blocks[0])
-        names = [s.name for s in symbols]
-        assert "fetch_data" in names
+        assert "fetch_data" in symbols
 
     def test_walrus_operator(self):
         source = dedent("""\
@@ -154,9 +146,8 @@ class TestBuildSymbolTable:
 
         blocks = find_script_blocks(source)
         symbols = build_symbol_table(blocks[0])
-        names = [s.name for s in symbols]
-        assert "y" in names
-        assert "result" in names
+        assert "y" in symbols
+        assert "result" in symbols
 
     def test_syntax_error_returns_empty(self):
         source = dedent("""\
@@ -166,7 +157,7 @@ class TestBuildSymbolTable:
 
         blocks = find_script_blocks(source)
         symbols = build_symbol_table(blocks[0])
-        assert symbols == []
+        assert symbols == {}
 
     def test_line_numbers_are_absolute(self):
         source = dedent("""\
@@ -181,11 +172,11 @@ class TestBuildSymbolTable:
 
         blocks = find_script_blocks(source)
         symbols = build_symbol_table(blocks[0])
-        sym_x = next(s for s in symbols if s.name == "x")
-        sym_foo = next(s for s in symbols if s.name == "foo")
+        sym_x = symbols.get("x")
+        sym_foo = symbols.get("foo")
         # x is on line 4 (0-based), foo on line 5
-        assert sym_x.line == 4
-        assert sym_foo.line == 5
+        assert sym_x and sym_x.line == 4
+        assert sym_foo and sym_foo.line == 5
 
 
 class TestGetDefinitionScriptToScript:
@@ -200,7 +191,9 @@ class TestGetDefinitionScriptToScript:
             </script>""")
 
         # Cursor on 'x' in print(x) — line 5, character 6
-        result = get_definition(source, Position(line=5, character=6), "file:///test.cgx")
+        result = get_definition(
+            source, Position(line=5, character=6), "file:///test.cgx"
+        )
         assert result is not None
         assert result.range.start.line == 4
         assert result.range.start.character == 0
@@ -214,7 +207,9 @@ class TestGetDefinitionScriptToScript:
             </script>""")
 
         # Cursor on 'handle_click' in the call — line 3
-        result = get_definition(source, Position(line=3, character=0), "file:///test.cgx")
+        result = get_definition(
+            source, Position(line=3, character=0), "file:///test.cgx"
+        )
         assert result is not None
         assert result.range.start.line == 1
 
@@ -226,7 +221,9 @@ class TestGetDefinitionScriptToScript:
             </script>""")
 
         # Cursor on 'path' in print(path)
-        result = get_definition(source, Position(line=2, character=6), "file:///test.cgx")
+        result = get_definition(
+            source, Position(line=2, character=6), "file:///test.cgx"
+        )
         assert result is not None
         assert result.range.start.line == 1
 
@@ -238,7 +235,9 @@ class TestGetDefinitionScriptToScript:
             </script>""")
 
         # Cursor on 'undefined_var'
-        result = get_definition(source, Position(line=2, character=6), "file:///test.cgx")
+        result = get_definition(
+            source, Position(line=2, character=6), "file:///test.cgx"
+        )
         assert result is None
 
     def test_cursor_on_non_identifier(self):
@@ -248,7 +247,9 @@ class TestGetDefinitionScriptToScript:
             </script>""")
 
         # Cursor on '+' operator — line 1, character 6
-        result = get_definition(source, Position(line=1, character=6), "file:///test.cgx")
+        result = get_definition(
+            source, Position(line=1, character=6), "file:///test.cgx"
+        )
         assert result is None
 
 
@@ -264,7 +265,9 @@ class TestGetDefinitionTemplateToScript:
 
         # Cursor on 'message' in {{ message }} — line 1
         # "  <div>{{ message }}</div>" — 'message' starts at character 12
-        result = get_definition(source, Position(line=1, character=12), "file:///test.cgx")
+        result = get_definition(
+            source, Position(line=1, character=12), "file:///test.cgx"
+        )
         assert result is not None
         assert result.range.start.line == 4
         assert result.range.start.character == 0
@@ -279,7 +282,9 @@ class TestGetDefinitionTemplateToScript:
             </script>""")
 
         # Cursor on 'unknown_var' in {{ unknown_var }}
-        result = get_definition(source, Position(line=1, character=12), "file:///test.cgx")
+        result = get_definition(
+            source, Position(line=1, character=12), "file:///test.cgx"
+        )
         assert result is None
 
     def test_cursor_outside_interpolation(self):
@@ -292,7 +297,9 @@ class TestGetDefinitionTemplateToScript:
             </script>""")
 
         # Cursor on 'Hello' in template text (not in {{ }})
-        result = get_definition(source, Position(line=1, character=8), "file:///test.cgx")
+        result = get_definition(
+            source, Position(line=1, character=8), "file:///test.cgx"
+        )
         assert result is None
 
     def test_triple_brace_interpolation(self):
@@ -305,7 +312,9 @@ class TestGetDefinitionTemplateToScript:
             </script>""")
 
         # Cursor on 'message' in {{{ message }}}
-        result = get_definition(source, Position(line=1, character=13), "file:///test.cgx")
+        result = get_definition(
+            source, Position(line=1, character=13), "file:///test.cgx"
+        )
         assert result is not None
         assert result.range.start.line == 4
 
@@ -320,7 +329,9 @@ class TestGetDefinitionTemplateToScript:
             </script>""")
 
         # Cursor on 'handle_click' in {{ handle_click }}
-        result = get_definition(source, Position(line=1, character=24), "file:///test.cgx")
+        result = get_definition(
+            source, Position(line=1, character=24), "file:///test.cgx"
+        )
         assert result is not None
         assert result.range.start.line == 4
 
@@ -328,7 +339,9 @@ class TestGetDefinitionTemplateToScript:
 class TestGetDefinitionEdgeCases:
     def test_no_script_block(self):
         source = "<template><div>{{ x }}</div></template>"
-        result = get_definition(source, Position(line=0, character=19), "file:///test.cgx")
+        result = get_definition(
+            source, Position(line=0, character=19), "file:///test.cgx"
+        )
         assert result is None
 
     def test_cursor_outside_script_and_template(self):
@@ -344,7 +357,9 @@ class TestGetDefinitionEdgeCases:
             </style>""")
 
         # Cursor in <style> block
-        result = get_definition(source, Position(line=7, character=1), "file:///test.cgx")
+        result = get_definition(
+            source, Position(line=7, character=1), "file:///test.cgx"
+        )
         assert result is None
 
     def test_definition_uri_preserved(self):
